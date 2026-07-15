@@ -9,23 +9,37 @@ from models import Film, WatchlistEntry
 from services.collection_service import FilmNotFoundError
 
 
-def save_to_watchlist(user_id, film_id):
+class DuplicateWatchlistEntryError(Exception):
+    """Raised when a film is already on the user's watchlist."""
+    pass
+
+
+def add_to_watchlist(user_id, film_id):
     """
     Save a film to a user's watchlist.
 
     Args:
         user_id (str): UUID of the user.
-        film_id (int): ID of the film. (Note: integer — pre-refactor)
+        film_id (str): UUID of the film.
 
     Returns:
         WatchlistEntry: The newly created entry.
 
     Raises:
         FilmNotFoundError: If film_id does not exist.
+        DuplicateWatchlistEntryError: If the film is already on the user's watchlist.
     """
     film = db.session.get(Film, film_id)
     if film is None:
         raise FilmNotFoundError(f"No film found with id '{film_id}'")
+
+    existing = WatchlistEntry.query.filter_by(
+        user_id=user_id, film_id=film_id
+    ).first()
+    if existing:
+        raise DuplicateWatchlistEntryError(
+            f"Film '{film_id}' is already on this user's watchlist"
+        )
 
     entry = WatchlistEntry(user_id=user_id, film_id=film_id)
     db.session.add(entry)
@@ -41,13 +55,14 @@ def get_watchlist(user_id):
         user_id (str): UUID of the user.
 
     Returns:
-        list[dict]: List of film dicts with watchlist metadata attached.
+        list[dict]: List of film dicts with watchlist metadata attached,
+                    sorted by date added (most recently added first).
     """
     entries = (
         WatchlistEntry.query
         .filter_by(user_id=user_id)
         .join(Film)
-        .order_by(Film.title.asc())
+        .order_by(WatchlistEntry.date_added.desc())
         .all()
     )
 
