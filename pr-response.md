@@ -2,7 +2,7 @@
 
 ## AI Usage
 <!-- Fill in at the end — how you used AI tools during this project -->
-
+I used Claude throughout this PR mostly to implement decisions I'd already made, not to make them for me. For Comment 2, I described the dedup pattern I wanted and had Claude implement `DuplicateWatchlistEntryError` and the matching check in `services/watchlist_service.py`. For Comment 3, I pointed it at `test_collection.py`'s fixture pattern and had it write `test_add_to_watchlist_nonexistent_film_raises` in the same style. The positions in Comments 4 and 5 on default visibility and sort order are mine; I used Claude to help me phrase the reasoning and tradeoffs clearly. I also used it to keep the integer-to-UUID cleanup consistent across `services/watchlist_service.py`, `routes/watchlist/watchlist.py`, and `tests/test_watchlist.py`. I reviewed and ran everything along the way, including the test suite and the manual `curl`/Flask test client checks noted in each comment above.
 
 ## Comment 1 — Rename
 
@@ -43,3 +43,19 @@
 
 ## PR Description
 <!-- Written at the end — feature overview, design decisions, manual testing steps -->
+
+This PR adds the watchlist feature to CineLog. Users can now save films they want to watch later, view their list, and see it in the same style as the existing collection feature.
+
+**What's new:**
+- `add_to_watchlist()` and `get_watchlist()` in `services/watchlist_service.py`, plus the `GET /watchlist/<user_id>` and `POST /watchlist/<user_id>/add` routes.
+- A `WatchlistEntry` model with a `public` field, so a user's watchlist can be shown to other users by default.
+- Duplicate protection: adding the same film twice now raises `DuplicateWatchlistEntryError` and returns a 409, matching how `add_to_collection()` already handles duplicates.
+- A first test file, `tests/test_watchlist.py`, covering the missing-film case.
+
+**Design decisions (see Comments 4 and 5 above for the full reasoning):**
+- Watchlists default to `public=True`, since CineLog is meant to be a social app and a private-by-default watchlist would work against that.
+- The watchlist sorts by `date_added` (newest first) instead of by title, since a watchlist is a queue of "what's next," not an archive you look things up in.
+
+**Rebase note:** this branch was rebased onto `main` after the UUID refactor landed. See Comment 6 for what broke and how I fixed it.
+
+**Manual testing:** I ran the full `pytest` suite after every change (5 tests passing), and used the Flask test client and `curl` to hit the watchlist endpoints directly — adding a film, adding it again to confirm the 409, and fetching the watchlist to confirm sort order.
