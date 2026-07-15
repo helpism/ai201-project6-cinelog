@@ -35,9 +35,11 @@
 **Engagement with reviewer's point:** @dev-lead's point about users wanting to see what they added recently is exactly right, and it's worth noting we already made this same call for `get_collection()`, which sorts by `date_added` descending for newest-first. Sorting the watchlist alphabetically was inconsistent with that precedent, not a deliberate product decision — this change brings both features in line with the same convention rather than leaving alphabetical as a one-off exception. I'm not proposing a hybrid or a sort query param for this PR; that's reasonable as a future enhancement, but @dev-lead asked for a decision, and recency-first is the correct default for how a watchlist is actually used.
 
 ## Comment 6 — Rebase
-**What conflicted:**
-**How I resolved it:**
-**How I verified no conflict remains:**
+**What conflicted:** Rebasing `feature/watchlist` onto `main` hit a textual conflict in `.gitignore` (both branches added `.venv/`/`venv/` separately). More importantly, replaying the "added watchlist model" commit on top of main's `refactor: migrate film IDs from integer to UUID` auto-merged without a visible conflict but silently dropped the `WatchlistEntry` class from `models.py`, since that commit's diff was written against the old integer-ID version of the file. That left `Film.watchlist_entries` pointing at a class that no longer existed, and the rest of the watchlist code (`services/watchlist_service.py`, `routes/watchlist/watchlist.py`, `tests/test_watchlist.py`) still referenced integer `film_id`s instead of the new UUID type.
+
+**How I resolved it:** I merged `.gitignore` to keep both entries. I re-added `WatchlistEntry` to `models.py` with `film_id` typed as `db.String(36)`, matching `CollectionEntry.film_id`'s post-refactor UUID pattern, then updated the remaining integer references to match: the docstring in `add_to_watchlist()`, the `Body: { "film_id": ... }` comment in `routes/watchlist/watchlist.py`, and `fake_film_id` in `test_add_to_watchlist_nonexistent_film_raises`, all switched from integer to UUID-string form.
+
+**How I verified no conflict remains:** I called `db.create_all()` against an in-memory SQLite DB and confirmed the mapper resolves cleanly with `Film.id` and `WatchlistEntry.film_id` both reporting as `VARCHAR(36)`. I ran the full test suite after `git rebase --continue` — all 5 tests pass. I also confirmed no merge commits remain: `git log --merges main..feature/watchlist` returns nothing, and `git log --oneline --graph` shows a linear history.
 
 ## PR Description
 <!-- Written at the end — feature overview, design decisions, manual testing steps -->
